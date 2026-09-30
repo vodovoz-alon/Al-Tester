@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>מבחן הזמנים · English Practice</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&family=Assistant:wght@400;600;700&family=Caveat:wght@700&display=swap');
+html,body{margin:0;padding:0;background:#E7E4DC;}
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl;font-family:'Assistant',system-ui,sans-serif;background:radial-gradient(1000px 700px at 50% -5%, #efece4, #E7E4DC);}
+.gate-card{background:#FCFBF7;border:1px solid #E4E0D4;border-radius:16px;padding:32px 28px;width:min(360px,100%);box-shadow:0 24px 60px -24px rgba(0,0,0,.45);text-align:center;}
+.gate-card h1{font-family:'Nunito';font-weight:900;font-size:30px;margin:0 0 2px;color:#1E1E1C;}
+.gate-card .sub{color:#6B6B64;font-size:14px;margin:0 0 22px;}
+.gate-field{text-align:right;margin-bottom:14px;}
+.gate-field label{display:block;font-size:13px;font-weight:700;color:#6B6B64;margin-bottom:5px;}
+.gate-field input{width:100%;box-sizing:border-box;border:1.5px solid #D7D4C9;border-radius:10px;padding:11px 12px;font-family:'Assistant';font-size:16px;color:#1E1E1C;outline:none;background:#fff;transition:border-color .15s;}
+.gate-field input:focus{border-color:#243F93;}
+.gate-btn{width:100%;border:none;border-radius:11px;background:#1E1E1C;color:#fff;font-family:'Nunito';font-weight:800;font-size:16px;padding:13px;cursor:pointer;margin-top:6px;transition:transform .12s;}
+.gate-btn:hover{transform:translateY(-1px);}
+.gate-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.gate-err{color:#CE2C2C;font-size:14px;margin-top:12px;font-weight:600;min-height:18px;}
+@media print { .gate{display:none !important;} }
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+/* =========================================================================
+   English Practice — Mixed Tenses  ·  styled as a photocopied 7th-grade test
+   Sections mirror the uploaded worksheet:
+     A) Circle the correct answer
+     B) Complete with the correct form of the verb
+     C) Fill in: Am / Is / Are / Do / Does / Did
+   You fill the whole page in "pen", hand it in, and a "teacher" grades it with
+   red/green marks, a circled grade, and short Hebrew notes. Items are AI-made.
+   ========================================================================= */
+
+const STYLE = `
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Assistant:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap');
+
+.ws-root{
+  --desk:#E7E4DC;
+  --paper:#FCFBF7;
+  --ink:#1E1E1C;
+  --faint:#6B6B64;
+  --rule:#D7D4C9;
+  --pen:#243F93;      /* student's blue pen */
+  --ok:#1E8E4E;       /* teacher green */
+  --bad:#CE2C2C;      /* teacher red */
+  direction:rtl;
+  background:radial-gradient(1000px 700px at 50% -5%, #efece4, var(--desk));
+  min-height:100vh;width:100%;padding:clamp(14px,3.5vw,40px);box-sizing:border-box;
+  font-family:'Assistant',system-ui,sans-serif;color:var(--ink);
+}
+.ws-root *{box-sizing:border-box;}
+
+/* setup chrome (Hebrew, RTL) */
+.ws-setup{max-width:640px;margin:0 auto;}
+.ws-eyebrow{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:0 0 6px;}
+.ws-h1{font-family:'Nunito';font-weight:900;font-size:clamp(28px,6vw,42px);margin:0 0 8px;letter-spacing:-.01em;}
+.ws-lead{color:var(--faint);font-size:16px;line-height:1.55;margin:0 0 26px;max-width:46ch;}
+.ws-panel{background:#fff;border:1px solid var(--rule);border-radius:16px;padding:clamp(18px,4vw,28px);box-shadow:0 12px 34px -20px rgba(0,0,0,.4);}
+.ws-flabel{font-size:13px;font-weight:700;color:var(--faint);margin:0 0 9px;}
+.ws-chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:22px;}
+.ws-chip{font-size:14px;font-weight:600;cursor:pointer;padding:9px 15px;border-radius:999px;border:1.5px solid var(--rule);background:#fff;color:var(--ink);transition:.15s;user-select:none;}
+.ws-chip:hover{border-color:var(--faint);}
+.ws-chip[data-on="true"]{border-color:var(--pen);background:color-mix(in srgb,var(--pen) 10%,#fff);}
+.ws-start{font-family:'Nunito';font-weight:800;font-size:16px;cursor:pointer;border:none;border-radius:12px;padding:14px 28px;color:#fff;background:var(--ink);transition:transform .12s;}
+.ws-start:hover{transform:translateY(-1px);}
+.ws-start:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+.ws-err{margin-top:14px;background:color-mix(in srgb,var(--bad) 8%,#fff);border:1px solid color-mix(in srgb,var(--bad) 35%,#fff);border-radius:10px;padding:12px 14px;font-size:15px;}
+.ws-loading{text-align:center;padding:40px 0;}
+.ws-spin{width:34px;height:34px;border:3px solid var(--rule);border-top-color:var(--ink);border-radius:50%;margin:0 auto 14px;animation:ws-rot .8s linear infinite;}
+@keyframes ws-rot{to{transform:rotate(360deg)}}
+.ws-loading p{color:var(--faint);font-family:'Nunito';font-size:18px;}
+
+/* the paper (English, LTR) */
+.ws-page{
+  direction:ltr;text-align:left;max-width:760px;margin:0 auto;background:var(--paper);
+  border:1px solid #E4E0D4;border-radius:6px;padding:clamp(22px,5vw,52px);
+  box-shadow:0 24px 60px -24px rgba(0,0,0,.45), 0 2px 0 #f4f1e8 inset;
+  font-family:'Nunito',sans-serif;position:relative;overflow:hidden;
+}
+.ws-page::before{content:"";position:absolute;top:0;bottom:0;left:0;width:34px;
+  border-right:1.5px solid color-mix(in srgb,var(--bad) 30%,transparent);opacity:.5;}
+.ws-headline{text-align:center;margin:0 0 4px;}
+.ws-headline h2{font-family:'Nunito';font-weight:900;font-size:clamp(18px,3.5vw,24px);margin:0;display:inline-block;border-bottom:2px solid var(--ink);padding-bottom:3px;}
+.ws-headline p{color:var(--faint);font-size:13px;margin:8px 0 0;letter-spacing:.02em;}
+.ws-metarow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 22px;margin:18px 0 6px;}
+.ws-field{display:flex;align-items:flex-end;gap:8px;font-weight:700;font-size:14px;}
+.ws-field input{font-family:'Caveat';font-size:20px;color:var(--pen);border:none;border-bottom:1.5px dotted #b9b6ab;background:transparent;outline:none;width:110px;padding:0 4px 2px;}
+.ws-row-badge{margin-left:auto;font-family:'Nunito';font-weight:900;font-size:18px;border:2px solid var(--ink);border-radius:6px;padding:3px 12px;}
+.ws-instr{font-size:14px;color:var(--faint);margin:6px 0 4px;font-style:italic;}
+.ws-divider{border:none;border-top:1px solid var(--rule);margin:20px 0;}
+
+.ws-sec{margin:22px 0 6px;}
+.ws-sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;border-bottom:1px solid var(--rule);padding-bottom:5px;margin-bottom:14px;}
+.ws-sec-h .lhs{font-family:'Nunito';font-weight:800;font-size:17px;}
+.ws-sec-h .lhs .ltr{color:var(--faint);font-weight:700;}
+.ws-sec-h .he{direction:rtl;font-family:'Assistant';font-weight:700;font-size:14px;color:var(--faint);margin-left:8px;}
+.ws-sec-h .pts{font-family:'Nunito';font-weight:800;font-size:14px;color:var(--faint);white-space:nowrap;}
+
+.ws-item{position:relative;padding:9px 46px 9px 8px;border-radius:8px;}
+.ws-item.answered-wrong{background:color-mix(in srgb,var(--bad) 5%,transparent);}
+.ws-item.answered-ok{background:color-mix(in srgb,var(--ok) 5%,transparent);}
+.ws-line{font-size:16.5px;line-height:1.9;}
+.ws-num{font-weight:800;margin-right:8px;}
+.ws-fillline{display:inline-block;border-bottom:1.5px solid var(--ink);min-width:70px;vertical-align:baseline;}
+
+.ws-blank{font-family:'Caveat';font-weight:700;font-size:21px;color:var(--pen);text-align:center;
+  border:none;border-bottom:2px solid #9c99b8;background:color-mix(in srgb,var(--pen) 5%,transparent);
+  outline:none;padding:0 6px 1px;margin:0 3px;border-radius:3px 3px 0 0;line-height:1.2;}
+.ws-blank:focus{border-color:var(--pen);background:color-mix(in srgb,var(--pen) 10%,transparent);}
+.ws-blank:disabled{opacity:1;}
+.ws-hint{font-style:italic;color:var(--faint);font-size:15px;margin-left:4px;}
+
+.ws-opts{display:flex;flex-wrap:wrap;gap:10px 24px;margin:8px 0 2px 22px;}
+.ws-opt{position:relative;cursor:pointer;font-size:16px;padding:4px 12px;user-select:none;transition:color .15s;}
+.ws-opt .lt{font-weight:800;color:var(--faint);margin-right:5px;}
+.ws-opt[data-sel="true"]::after{content:"";position:absolute;inset:-4px -8px;border:2.5px solid var(--pen);
+  border-radius:60% 40% 55% 45% / 48% 55% 45% 52%;pointer-events:none;}
+.ws-opt[data-correct="true"]{color:var(--ok);font-weight:800;}
+.ws-opt .miniv{color:var(--ok);font-family:'Caveat';font-weight:700;font-size:20px;margin-left:6px;}
+
+.ws-mark{position:absolute;top:8px;right:8px;font-family:'Caveat';font-weight:700;font-size:30px;line-height:1;}
+.ws-mark.ok{color:var(--ok);}
+.ws-mark.bad{color:var(--bad);}
+
+.ws-notewrap{margin:4px 22px 4px 6px;}
+.ws-corr{direction:ltr;font-family:'Caveat';font-weight:700;font-size:19px;color:var(--bad);margin:2px 0 6px;}
+.ws-corr .corr{color:var(--bad);}
+.ws-explain{direction:rtl;font-family:'Assistant';background:color-mix(in srgb,var(--bad) 5%,#fff);
+  border-right:3px solid color-mix(in srgb,var(--bad) 55%,#fff);border-radius:8px;padding:10px 13px;}
+.ws-explain .hd{font-weight:700;font-size:12.5px;color:var(--bad);margin-bottom:4px;letter-spacing:.02em;}
+.ws-explain .bd{font-size:14.5px;color:#3a3a38;line-height:1.65;}
+.ws-explain .bd.wait{color:var(--faint);font-style:italic;}
+.ws-recheck{direction:rtl;background:transparent;border:1px solid color-mix(in srgb,var(--pen) 40%,#fff);color:var(--pen);
+  font-family:'Assistant';font-weight:700;font-size:12.5px;border-radius:999px;padding:4px 11px;cursor:pointer;margin:4px 0 0;}
+.ws-recheck:disabled{opacity:.5;cursor:not-allowed;}
+.ws-ai{direction:rtl;font-family:'Assistant';font-size:13px;color:var(--pen);margin-top:4px;font-weight:600;}
+
+/* teacher's grade + footer */
+.ws-grade{position:absolute;top:clamp(16px,4vw,40px);right:clamp(16px,5vw,54px);text-align:center;}
+.ws-grade .num{font-family:'Caveat';font-weight:700;font-size:52px;color:var(--bad);line-height:.9;position:relative;display:inline-block;padding:2px 10px;}
+.ws-grade .num::after{content:"";position:absolute;inset:-6px -4px;border:3px solid var(--bad);
+  border-radius:58% 42% 50% 50% / 50% 55% 45% 50%;}
+.ws-grade .word{font-family:'Caveat';font-weight:700;font-size:22px;color:var(--bad);margin-top:8px;}
+.ws-footer{text-align:center;margin-top:26px;font-family:'Nunito';font-weight:800;font-size:20px;color:var(--faint);}
+
+.ws-bar{direction:rtl;max-width:760px;margin:16px auto 0;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.ws-btn{font-family:'Assistant';font-weight:700;font-size:15px;cursor:pointer;border:none;border-radius:11px;padding:12px 24px;color:#fff;background:var(--ink);transition:transform .12s;}
+.ws-btn:hover{transform:translateY(-1px);}
+.ws-btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--rule);}
+.ws-summary{direction:rtl;text-align:center;font-family:'Assistant';color:var(--faint);font-size:15px;margin:2px auto 0;max-width:760px;}
+
+/* reading comprehension (Unseen) */
+.ws-passage{border:1px solid var(--rule);border-radius:8px;padding:16px 18px;margin:4px 0 16px;background:#fff;}
+.ws-passage h3{font-family:'Nunito';font-weight:900;font-size:18px;text-align:center;margin:0 0 10px;}
+.ws-passage p{font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.75;margin:0;white-space:pre-wrap;}
+.ws-subh{font-family:'Nunito';font-weight:800;font-size:15px;margin:16px 0 8px;}
+.ws-subh .he{direction:rtl;font-family:'Assistant';font-weight:700;font-size:13px;color:var(--faint);margin-left:6px;}
+.ws-tf{display:inline-flex;gap:6px;margin-left:14px;vertical-align:middle;}
+.ws-answerbox{display:block;width:100%;margin-top:6px;font-family:'Caveat';font-weight:700;font-size:20px;color:var(--pen);
+  border:none;border-bottom:2px solid #9c99b8;background:color-mix(in srgb,var(--pen) 5%,transparent);
+  outline:none;padding:5px 8px;border-radius:4px 4px 0 0;resize:vertical;min-height:50px;line-height:1.4;}
+.ws-answerbox:focus{border-color:var(--pen);}
+.ws-answerbox:disabled{opacity:1;}
+.ws-model{direction:ltr;font-family:Georgia,serif;font-style:italic;font-size:15px;color:var(--ok);margin:6px 0 0;}
+.ws-model b{font-style:normal;}
+
+/* print: turn the page into a clean worksheet */
+@media print {
+  .ws-root{background:#fff !important;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .ws-page{box-shadow:none !important;border:none;border-radius:0;max-width:100%;margin:0;padding:0 6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .ws-bar, .ws-summary, .ws-recheck{display:none !important;}
+  .ws-item, .ws-passage{page-break-inside:avoid;}
+  .ws-answerbox{min-height:64px;}
+  @page{margin:12mm;}
+}
+`;
+
+const TENSES = {
+  present_simple:      "Present Simple",
+  present_progressive: "Present Progressive",
+  future:              "Future",
+  past_simple:         "Past Simple",
+};
+const TENSE_HE = {
+  present_simple: "הווה פשוט", present_progressive: "הווה מתמשך", future: "עתיד", past_simple: "עבר פשוט",
+};
+
+const SECTIONS = {
+  circle:    { he: "הקף את התשובה הנכונה",              en: "Circle the correct answer",         letter: "A" },
+  verb:      { he: "השלם בצורת הפועל הנכונה",           en: "Complete with the correct form of the verb", letter: "B" },
+  auxiliary: { he: "השלם: Am / Is / Are / Do / Does / Did", en: "Fill in: Am, Is, Are, Do, Does, Did", letter: "C" },
+  wh:        { he: "השלם את מילת השאלה (WH)",           en: "Complete the WH question",          letter: "D" },
+};
+const SECTION_ORDER = ["circle", "verb", "auxiliary", "wh"];
+const AUX_TENSES = ["present_simple", "present_progressive", "past_simple"]; // future uses "will", not in this section
+const LETTERS = ["a", "b", "c", "d"];
+const norm = (s) => (s || "").toString().toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9' ]/g, " ").replace(/\s+/g, " ").trim();
+
+async function callClaude(user, system) {
+  const res = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system, messages: [{ role: "user", content: user }] }),
+  });
+  if (res.status === 401) { location.reload(); throw new Error("auth"); }
+  if (!res.ok) throw new Error("proxy " + res.status);
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+  return JSON.parse(text.replace(/```json/gi, "").replace(/```/g, "").trim());
+}
+const GEN_SYS = "You generate 7th-grade English grammar test items for native Hebrew speakers. Output ONLY valid JSON — no markdown, no code fences, no commentary. Keep 'explanation_he' to at most 10 Hebrew words.";
+
+function promptFor(section, n, tenseList) {
+  if (section === "wh")
+    return `Generate ${n} "complete the WH question" items at Israeli 7th-grade level. Each item is a natural English question that BEGINS with the blank "___" where a WH question word is missing, and ENDS with a short answer in parentheses that makes the correct WH word clear — e.g. "___ do you go to school? (By bus.)". Use a variety of WH words across the items: What, Where, When, Who, Why, Which, Whose, How, How many, How much, How long, How often. "answers" = the acceptable WH word(s), capitalized. Keep vocabulary simple and everyday. "explanation_he" = one short Hebrew sentence: which WH word fits and what it asks about. Return ONLY JSON: {"items":[{"sentence":"___ do you go to school? (By bus.)","answers":["How"],"explanation_he":"‘By bus’ עונה על אופן הנסיעה → How."}]}`;
+  const base = `LEVEL: an Israeli 7th-grade school English test. Use only simple everyday vocabulary and short single-clause sentences — the exact difficulty of these real examples: "The class goes on trips ___.", "My dad ___ (not work) last Saturday.", "___ your mother baking today?", "Mr. Levi ___ a new car 2 weeks ago." Common verbs only (go, play, watch, work, study, buy, travel, eat, drink, sing, dance, run, write, send, talk, meet, practise, like, read, clean, cook, help). Everyday subjects (I/you/he/she/we/they and simple names such as Dan, Rina, Tamar, Guy, Shir). No idioms, no rare words, no long sentences. Mixed tenses, drawn ONLY from: ${tenseList}. Every item includes a clear TIME SIGNAL (e.g. every day, usually, on Mondays, right now, at the moment, yesterday, last night, two days ago, tomorrow, next week) so the tense is inferable. Never name the tense inside the item text. Vary subjects and verbs.`;
+  if (section === "circle")
+    return `Generate ${n} multiple-choice "circle the correct answer" items. Each: a sentence with one blank "___", exactly 3 options, one correct. Mix items that test the correct verb form with items that test the correct time expression. Give "correct" as the 0-based index. ${base}\nJSON: {"items":[{"stem":"The class goes on trips ___.","options":["yesterday","now","once a month"],"correct":2,"tense":"present_simple","explanation_he":"פעולה קבועה בהווה פשוט."}]}`;
+  if (section === "verb")
+    return `Generate ${n} "complete with the correct form of the verb" items. Each: a sentence with exactly one blank "___", a base "verb", a boolean "negative" (true when the verb must be negated), and a time signal. "answers" lists all acceptable forms (for negatives include contracted AND full, e.g. "didn't work" and "did not work"). ${base}\nJSON: {"items":[{"sentence":"My dad ___ last Saturday.","verb":"work","negative":true,"answers":["didn't work","did not work"],"tense":"past_simple","explanation_he":"עבר, שלילה didn't + work."}]}`;
+  // auxiliary
+  return `Generate ${n} "fill in the auxiliary" items using ONLY Am, Is, Are, Do, Does, Did. Each: a QUESTION that BEGINS with the blank "___", plus a time signal. "answers" = the acceptable auxiliary(ies), capitalized as a sentence start. ${base}\nJSON: {"items":[{"sentence":"___ your mother baking today?","answers":["Is"],"tense":"present_progressive","explanation_he":"הווה מתמשך, יחיד → Is."}]}`;
+}
+
+function validate(section, arr) {
+  return (arr || []).filter(x => {
+    if (!x) return false;
+    if (section === "circle") return typeof x.stem === "string" && Array.isArray(x.options) && x.options.length >= 2 && Number.isInteger(x.correct) && x.correct < x.options.length;
+    if (section === "verb") return typeof x.sentence === "string" && x.sentence.includes("___") && x.verb && Array.isArray(x.answers) && x.answers.length;
+    return typeof x.sentence === "string" && x.sentence.includes("___") && Array.isArray(x.answers) && x.answers.length;
+  }).map((x, i) => ({ ...x, section, id: `${section[0]}${i}` }));
+}
+
+const READ_SYS = "You write simple 7th-grade English reading-comprehension tests for native Hebrew speakers. Output ONLY valid JSON — no markdown, no code fences, no commentary. Keep any 'explanation_he' to at most 12 Hebrew words.";
+const READ_TOPICS = ["a girl who saves a forest", "a boy who helps a lost dog", "a class trip to the beach", "a family that starts recycling", "a girl who learns to swim", "a boy who builds a treehouse", "a new student at school", "a girl who starts a school garden", "kids who clean up their park", "a boy who wins a race"];
+
+async function genReading() {
+  const topic = READ_TOPICS[Math.floor(Math.random() * READ_TOPICS.length)];
+  const pa = `Write a simple 7th-grade English reading passage about ${topic}. Rules: a short title, then about 120 words in short everyday sentences, mixing past and present tense, common vocabulary only (in the style of a "Yael Saves the Forest" school text). Then write comprehension questions ABOUT THE PASSAGE:
+- "complete": 5 fill-in items. Each is a sentence with ONE blank "___" whose answer appears in the passage. "answers" = acceptable fill-ins (lowercase).
+- "truefalse": 5 statements about the passage, each with a boolean "isTrue".
+Each item also gets a short "explanation_he" (Hebrew, pointing to where in the text the answer is).
+Return ONLY JSON: {"title":"...","passage":"...","complete":[{"sentence":"Everyone in the town loves the ___.","answers":["forest"],"explanation_he":"..."}],"truefalse":[{"statement":"...","isTrue":true,"explanation_he":"..."}]}`;
+  const a = await callClaude(pa, READ_SYS);
+  if (!a || !a.passage) throw new Error("no passage");
+
+  const pb = `Passage:\n"""${a.passage}"""\nWrite 3 "answer in full" comprehension questions about this passage. For each give: "question" (English), "model_en" (a short correct answer in English), and "key_points" (2-3 short strings the answer must contain). Return ONLY JSON: {"answer":[{"question":"What did the mayor tell Yael to do?","model_en":"He told her to write a letter.","key_points":["write a letter"]}]}`;
+  let b = { answer: [] };
+  try { b = await callClaude(pb, READ_SYS); } catch { /* answer-in-full is optional */ }
+
+  return {
+    title: a.title || "Reading",
+    passage: a.passage,
+    complete: (a.complete || []).filter(x => x && typeof x.sentence === "string" && x.sentence.includes("___") && Array.isArray(x.answers) && x.answers.length)
+      .slice(0, 5).map((x, i) => ({ ...x, id: `rc${i}`, kind: "complete" })),
+    truefalse: (a.truefalse || []).filter(x => x && typeof x.statement === "string" && typeof x.isTrue === "boolean")
+      .slice(0, 5).map((x, i) => ({ ...x, id: `rt${i}`, kind: "truefalse" })),
+    answer: (b.answer || []).filter(x => x && typeof x.question === "string")
+      .slice(0, 3).map((x, i) => ({ ...x, id: `ra${i}`, kind: "answer" })),
+  };
+}
+
+function EnglishTest() {
+  const [screen, setScreen] = useState("setup"); // setup | loading | test
+  const [sections, setSections] = useState(new Set(SECTION_ORDER));
+  const [tenses, setTenses] = useState(new Set(Object.keys(TENSES)));
+  const [count, setCount] = useState(5);
+  const [error, setError] = useState("");
+
+  const [items, setItems] = useState([]);          // flat, ordered by section
+  const [answers, setAnswers] = useState({});       // id -> string | number(index)
+  const [meta, setMeta] = useState({ name: "", cls: "", date: "" });
+  const [graded, setGraded] = useState(false);
+  const [marks, setMarks] = useState({});           // id -> boolean (correct)
+  const [ai, setAi] = useState({});                 // id -> {loading,done,correct,text}
+  const [explains, setExplains] = useState({});     // id -> detailed Hebrew explanation
+  const [explaining, setExplaining] = useState(false);
+  const [reading, setReading] = useState(null);      // {title,passage,complete,truefalse,answer}
+  const [openFb, setOpenFb] = useState({});          // answer-in-full id -> feedback_he
+  const [gradingOpen, setGradingOpen] = useState(false);
+
+  const toggle = (setter, cur, key, min = 1) => {
+    const n = new Set(cur); n.has(key) ? n.delete(key) : n.add(key);
+    if (n.size >= min) setter(n);
+  };
+
+  async function generate() {
+    setError(""); setScreen("loading");
+    const chosen = SECTION_ORDER.filter(s => sections.has(s));
+    const readingOn = sections.has("reading");
+    const pool = [...tenses];
+    try {
+      const tenseP = chosen.map(sec => {
+        const list = (sec === "auxiliary" ? pool.filter(t => AUX_TENSES.includes(t)) : pool);
+        const usable = list.length ? list : ["present_simple"];
+        const names = usable.map(t => TENSES[t]).join(", ");
+        return callClaude(promptFor(sec, count, names), GEN_SYS).then(r => validate(sec, (r.items || []).slice(0, count)));
+      });
+      const results = await Promise.all([...tenseP, readingOn ? genReading() : Promise.resolve(null)]);
+      const readingRes = results.pop();
+      const all = results.flat();
+      if (all.length < chosen.length) throw new Error("thin");
+      if (readingOn && !readingRes) throw new Error("no reading");
+      setItems(all); setReading(readingRes);
+      setAnswers({}); setMarks({}); setAi({}); setExplains({}); setExplaining(false); setOpenFb({}); setGradingOpen(false); setGraded(false);
+      setScreen("test");
+      preExplain(all.filter(it => it.section !== "wh")); // prepare tense explanations in the background while the student works
+    } catch {
+      setError("לא הצלחתי לייצר מבחן כרגע. נסה שוב — לרוב זה עובד בניסיון השני.");
+      setScreen("setup");
+    }
+  }
+
+  function isCorrect(it, ans) {
+    if (it.section === "circle") return ans === it.correct;
+    return it.answers.map(norm).includes(norm(ans));
+  }
+  function submit() {
+    const m = {};
+    items.forEach(it => { m[it.id] = isCorrect(it, answers[it.id]); });
+    if (reading) {
+      reading.complete.forEach(it => { m[it.id] = !!answers[it.id] && it.answers.map(norm).includes(norm(answers[it.id])); });
+      reading.truefalse.forEach(it => { m[it.id] = (typeof answers[it.id] === "boolean") && answers[it.id] === it.isTrue; });
+      // answer-in-full is graded by AI below (left undefined until then)
+    }
+    setMarks(m); setGraded(true);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    // tense explanations are usually already prepared in the background; backfill any missing
+    const missing = items.filter(it => it.section !== "wh" && !m[it.id] && !explains[it.id]);
+    if (missing.length) preExplain(missing);
+    if (reading && reading.answer.length) gradeOpen(reading);
+  }
+
+  // Generate detailed Hebrew explanations up front, in the background, so they
+  // appear instantly the moment an answer is marked wrong. Updates incrementally.
+  async function preExplain(list) {
+    if (!list.length) return;
+    setExplaining(true);
+    const describe = (it) => ({
+      id: it.id,
+      type: it.section,
+      sentence: it.section === "circle" ? it.stem : it.sentence,
+      tense: TENSES[it.tense],
+      correct_answer: it.section === "circle" ? it.options[it.correct] : it.answers[0],
+      ...(it.section === "verb" ? { base_verb: it.verb, negative: !!it.negative } : {}),
+    });
+    const chunks = [];
+    for (let i = 0; i < list.length; i += 6) chunks.push(list.slice(i, i + 6));
+    const sys = "You are a warm, clear English teacher for a 7th-grade native Hebrew speaker. Write in simple Hebrew. Output ONLY valid JSON.";
+    await Promise.all(chunks.map(async (ch) => {
+      try {
+        const user = `For each item write a short Hebrew explanation of 2–3 sentences covering, in order: (1) which TIME WORD in the sentence signals the tense and which tense it is; (2) the grammar RULE and the correct STRUCTURE of the answer (how to build it). Simple and friendly, like a good teacher. Items: ${JSON.stringify(ch.map(describe))}\nReturn ONLY JSON: {"explanations":[{"id":"v0","text_he":"..."}]}`;
+        const r = await callClaude(user, sys);
+        setExplains(prev => {
+          const mp = { ...prev };
+          (r.explanations || []).forEach(e => { if (e && e.id && !mp[e.id]) mp[e.id] = e.text_he; });
+          return mp;
+        });
+      } catch { /* fall back to the short explanation_he already on each item */ }
+    }));
+    setExplaining(false);
+  }
+
+  async function recheck(it) {
+    setAi(a => ({ ...a, [it.id]: { loading: true } }));
+    const stem = it.section === "circle" ? it.stem : it.sentence;
+    const exp = it.section === "circle" ? it.options[it.correct] : it.answers.join(", ");
+    const wrote = it.section === "circle" ? it.options[answers[it.id]] : answers[it.id];
+    const user = `English test item (${it.section}): "${stem}". Target tense: ${TENSES[it.tense]}. Expected: ${exp}. Student wrote: "${wrote}". Is it grammatically correct and acceptable here? Reply ONLY JSON: {"correct": true, "feedback_he": "הסבר קצר בעברית"}`;
+    try {
+      const r = await callClaude(user, "You judge English test answers. Output ONLY valid JSON.");
+      if (r.correct && !marks[it.id]) setMarks(m => ({ ...m, [it.id]: true }));
+      setAi(a => ({ ...a, [it.id]: { loading: false, done: true, correct: !!r.correct, text: r.feedback_he || "" } }));
+    } catch {
+      setAi(a => ({ ...a, [it.id]: { loading: false, done: true, correct: false, text: "לא הצלחתי לבדוק כרגע." } }));
+    }
+  }
+
+  async function gradeOpen(rd) {
+    setGradingOpen(true);
+    const payload = rd.answer.map(q => ({ id: q.id, question: q.question, model: q.model_en, key_points: q.key_points, student: answers[q.id] || "(left blank)" }));
+    const user = `A 7th-grade student answered reading-comprehension questions about a passage. For each, decide if the answer is essentially correct — it must capture the key points; spelling and grammar can be imperfect. Be kind but fair; a blank or off-topic answer is incorrect. Reply ONLY JSON: {"results":[{"id":"ra0","correct":true,"feedback_he":"הערה קצרה בעברית"}]}. Items: ${JSON.stringify(payload)}`;
+    try {
+      const r = await callClaude(user, "You kindly grade 7th-grade reading answers. Output ONLY valid JSON.");
+      const upd = {}, fb = {};
+      (r.results || []).forEach(x => { if (x && x.id) { upd[x.id] = !!x.correct; fb[x.id] = x.feedback_he || ""; } });
+      setMarks(prev => ({ ...prev, ...upd }));
+      setOpenFb(fb);
+    } catch { /* leave ungraded; the model answer is shown for self-check */ }
+    finally { setGradingOpen(false); }
+  }
+
+  const bySection = SECTION_ORDER.filter(s => sections.has(s)).map(s => ({ s, list: items.filter(i => i.section === s) })).filter(x => x.list.length);
+  const readingItems = reading ? [...reading.complete, ...reading.truefalse, ...reading.answer] : [];
+  const allGradable = [...items, ...readingItems];
+  const total = allGradable.length;
+  const correctCount = allGradable.filter(i => marks[i.id]).length;
+  const pct = total ? Math.round((correctCount / total) * 100) : 0;
+  const gradeWord = pct >= 90 ? "Excellent!" : pct >= 75 ? "Very good" : pct >= 55 ? "Good, keep going" : "Keep practising";
+
+  /* ---------------- SETUP ---------------- */
+  if (screen === "setup") {
+    return (
+      <div className="ws-root"><style>{STYLE}</style>
+        <div className="ws-setup">
+          <p className="ws-eyebrow">תרגול אנגלית · מבוסס AI</p>
+          <h1 className="ws-h1">מבחן הזמנים</h1>
+          <p className="ws-lead">תרגול בסגנון דף מבחן של כיתה ז', באותה רמה כמו בדף. ה-AI מרכיב מבחן חדש, אתה ממלא הכול בעט על הדף, ובסוף "המורה" בודקת עם ✓/✗ אדום-ירוק וציון מוקף בעיגול. על כל שאלה שטעית בה תקבל הסבר מפורט: איזו מילת זמן חושפת את הזמן, מה הכלל הדקדוקי, ולמה התשובה שלך שגויה.</p>
+          <div className="ws-panel">
+            <p className="ws-flabel">חלקי המבחן</p>
+            <div className="ws-chips">
+              {SECTION_ORDER.map(s => (
+                <span key={s} className="ws-chip" data-on={sections.has(s)} role="button" tabIndex={0}
+                      onClick={() => toggle(setSections, sections, s)}
+                      onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggle(setSections, sections, s)}>
+                  {SECTIONS[s].letter}) {SECTIONS[s].he}
+                </span>
+              ))}
+              <span className="ws-chip" data-on={sections.has("reading")} role="button" tabIndex={0}
+                    onClick={() => toggle(setSections, sections, "reading")}
+                    onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggle(setSections, sections, "reading")}>
+                הבנת הנקרא (Unseen)
+              </span>
+            </div>
+
+            <p className="ws-flabel">מאגר הזמנים (מעורבים בשאלות)</p>
+            <div className="ws-chips">
+              {Object.keys(TENSES).map(t => (
+                <span key={t} className="ws-chip" data-on={tenses.has(t)} role="button" tabIndex={0}
+                      onClick={() => toggle(setTenses, tenses, t)}
+                      onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggle(setTenses, tenses, t)}>
+                  {TENSE_HE[t]}
+                </span>
+              ))}
+            </div>
+
+            <p className="ws-flabel">שאלות בכל חלק</p>
+            <div className="ws-chips" style={{ marginBottom: 26 }}>
+              {[5, 8].map(c => (
+                <span key={c} className="ws-chip" data-on={count === c} role="button" tabIndex={0}
+                      onClick={() => setCount(c)} onKeyDown={e => (e.key === "Enter" || e.key === " ") && setCount(c)}>{c}</span>
+              ))}
+            </div>
+
+            <button className="ws-start" disabled={sections.size === 0} onClick={generate}>
+              הכן מבחן · {SECTION_ORDER.filter(s => sections.has(s)).length * count + (sections.has("reading") ? 13 : 0)} שאלות
+            </button>
+            {error && <div className="ws-err">{error}</div>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- LOADING ---------------- */
+  if (screen === "loading") {
+    return (
+      <div className="ws-root"><style>{STYLE}</style>
+        <div className="ws-setup">
+          <div className="ws-panel"><div className="ws-loading"><div className="ws-spin" /><p>מרכיבים מבחן טרי…</p></div></div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- TEST PAGE ---------------- */
+  let n = 0; // running item number across the page
+  return (
+    <div className="ws-root"><style>{STYLE}</style>
+      <div className="ws-page">
+        {graded && (
+          <div className="ws-grade">
+            <div className="num">{pct}</div>
+            <div className="word">{gradeWord}</div>
+          </div>
+        )}
+
+        <div className="ws-headline">
+          <h2>English Test · 7<sup>th</sup> grade</h2>
+          <p>Mixed Tenses</p>
+        </div>
+
+        <div className="ws-metarow">
+          <span className="ws-field">Name <input value={meta.name} disabled={graded} onChange={e => setMeta({ ...meta, name: e.target.value })} /></span>
+          <span className="ws-field">Class <input style={{ width: 60 }} value={meta.cls} disabled={graded} onChange={e => setMeta({ ...meta, cls: e.target.value })} /></span>
+          <span className="ws-field">Date <input style={{ width: 90 }} value={meta.date} disabled={graded} onChange={e => setMeta({ ...meta, date: e.target.value })} /></span>
+          <span className="ws-row-badge">Row A</span>
+        </div>
+        <p className="ws-instr">Answer all the questions. Then hand in your test.</p>
+        <hr className="ws-divider" />
+
+        {reading && (
+          <section className="ws-sec">
+            <div className="ws-sec-h">
+              <span className="lhs">Reading Comprehension<span className="he"> · הבנת הנקרא</span></span>
+              <span className="pts">(unseen)</span>
+            </div>
+            <div className="ws-passage">
+              <h3>{reading.title}</h3>
+              <p>{reading.passage}</p>
+            </div>
+
+            <div className="ws-subh">1. Complete the sentences<span className="he"> · השלם את המשפטים</span></div>
+            {reading.complete.map((it, i) => {
+              const a = answers[it.id]; const ok = marks[it.id]; const wrong = graded && !ok;
+              const cls = "ws-item" + (graded ? (ok ? " answered-ok" : " answered-wrong") : "");
+              const parts = it.sentence.split("___");
+              return (
+                <div className={cls} key={it.id}>
+                  {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                  <div className="ws-line">
+                    <span className="ws-num">{i + 1})</span>
+                    <span>{parts[0]}
+                      <input className="ws-blank" style={{ width: `${Math.max(5, (a || "").length + 2)}ch` }}
+                             value={a || ""} disabled={graded} placeholder="…"
+                             onChange={e => setAnswers({ ...answers, [it.id]: e.target.value })} />
+                      {parts[1] || ""}</span>
+                  </div>
+                  {wrong && (
+                    <div className="ws-notewrap">
+                      <div className="ws-corr">→ <span className="corr">{it.answers[0]}</span></div>
+                      <div className="ws-explain"><div className="hd">מהטקסט:</div><div className="bd">{it.explanation_he}</div></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="ws-subh">2. True or false<span className="he"> · נכון / לא נכון</span></div>
+            {reading.truefalse.map((it, i) => {
+              const a = answers[it.id]; const ok = marks[it.id]; const wrong = graded && !ok;
+              const cls = "ws-item" + (graded ? (ok ? " answered-ok" : " answered-wrong") : "");
+              return (
+                <div className={cls} key={it.id}>
+                  {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                  <div className="ws-line">
+                    <span className="ws-num">{i + 1})</span> <span>{it.statement}</span>
+                    <span className="ws-tf">
+                      {[["true", true], ["false", false]].map(([lbl, val]) => (
+                        <span key={lbl} className="ws-opt" role="button" tabIndex={0}
+                              data-sel={a === val} data-correct={graded && it.isTrue === val}
+                              onClick={() => !graded && setAnswers({ ...answers, [it.id]: val })}
+                              onKeyDown={e => !graded && (e.key === "Enter" || e.key === " ") && setAnswers({ ...answers, [it.id]: val })}>
+                          {lbl}{graded && it.isTrue === val && <span className="miniv">✓</span>}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {wrong && (
+                    <div className="ws-notewrap">
+                      <div className="ws-explain"><div className="hd">התשובה הנכונה: {it.isTrue ? "true" : "false"}</div><div className="bd">{it.explanation_he}</div></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {reading.answer.length > 0 && (
+              <>
+                <div className="ws-subh">3. Answer the questions in full<span className="he"> · ענה במשפט מלא</span></div>
+                {reading.answer.map((it, i) => {
+                  const a = answers[it.id]; const ok = marks[it.id];
+                  const cls = "ws-item" + (graded ? (ok ? " answered-ok" : (ok === false ? " answered-wrong" : "")) : "");
+                  return (
+                    <div className={cls} key={it.id}>
+                      {graded && ok !== undefined && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                      <div className="ws-line">
+                        <span className="ws-num">{i + 1})</span> <span>{it.question}</span>
+                      </div>
+                      <textarea className="ws-answerbox" value={a || ""} disabled={graded}
+                                placeholder="…" onChange={e => setAnswers({ ...answers, [it.id]: e.target.value })} />
+                      {graded && (
+                        <div className="ws-notewrap">
+                          {ok === undefined
+                            ? <div className="ws-explain"><div className="bd wait">{gradingOpen ? "המורה בודקת את התשובה…" : "בדיקה עצמית מול התשובה למטה"}</div></div>
+                            : (!ok && openFb[it.id] && <div className="ws-explain"><div className="hd">הערת המורה:</div><div className="bd">{openFb[it.id]}</div></div>)}
+                          <div className="ws-model"><b>answer:</b> {it.model_en}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </section>
+        )}
+
+        {bySection.map(({ s, list }, si) => (
+          <section className="ws-sec" key={s}>
+            <div className="ws-sec-h">
+              <span className="lhs">
+                {SECTIONS[s].letter}) {SECTIONS[s].en}
+                <span className="he"> · {SECTIONS[s].he}</span>
+              </span>
+              <span className="pts">({list.length} × 2 points)</span>
+            </div>
+
+            {list.map((it) => {
+              n += 1;
+              const a = answers[it.id];
+              const ok = marks[it.id];
+              const wrong = graded && !ok;
+              const air = ai[it.id] || {};
+              const cls = "ws-item" + (graded ? (ok ? " answered-ok" : " answered-wrong") : "");
+
+              if (it.section === "circle") {
+                const parts = it.stem.split("___");
+                return (
+                  <div className={cls} key={it.id}>
+                    {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                    <div className="ws-line">
+                      <span className="ws-num">{n})</span>
+                      <span>{parts[0]}{parts.length > 1 && <span className="ws-fillline" />}{parts[1] || ""}</span>
+                    </div>
+                    <div className="ws-opts">
+                      {it.options.map((opt, oi) => (
+                        <span key={oi} className="ws-opt" role="button" tabIndex={0}
+                              data-sel={a === oi} data-correct={graded && oi === it.correct}
+                              onClick={() => !graded && setAnswers({ ...answers, [it.id]: oi })}
+                              onKeyDown={e => !graded && (e.key === "Enter" || e.key === " ") && setAnswers({ ...answers, [it.id]: oi })}>
+                          <span className="lt">{LETTERS[oi]}.</span>{opt}
+                          {graded && oi === it.correct && <span className="miniv">✓</span>}
+                        </span>
+                      ))}
+                    </div>
+                    {wrong && (
+                      <div className="ws-notewrap">
+                        <div className="ws-corr">correct: <span className="corr">{it.options[it.correct]}</span></div>
+                        <div className="ws-explain">
+                          <div className="hd">איך מזהים את הזמן ומה הכלל:</div>
+                          {explains[it.id]
+                            ? <div className="bd">{explains[it.id]}</div>
+                            : <div className="bd wait">{explaining ? "המורה כותבת הסבר מפורט…" : it.explanation_he}</div>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // verb & auxiliary: single blank
+              const parts = it.sentence.split("___");
+              return (
+                <div className={cls} key={it.id}>
+                  {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                  <div className="ws-line">
+                    <span className="ws-num">{n})</span>
+                    <span>
+                      {parts[0]}
+                      <input className="ws-blank" style={{ width: `${Math.max(5, (a || "").length + 2)}ch` }}
+                             value={a || ""} disabled={graded} placeholder="…"
+                             onChange={e => setAnswers({ ...answers, [it.id]: e.target.value })} />
+                      {parts[1] || ""}
+                      {it.section === "verb" && <span className="ws-hint">({it.negative ? "not " : ""}{it.verb})</span>}
+                    </span>
+                  </div>
+                  {wrong && (
+                    <div className="ws-notewrap">
+                      <div className="ws-corr">→ <span className="corr">{it.answers[0]}</span></div>
+                      <div className="ws-explain">
+                        <div className="hd">{it.section === "wh" ? "איזו מילת שאלה ולמה:" : "איך מזהים את הזמן ומה הכלל:"}</div>
+                        {it.section === "wh"
+                          ? <div className="bd">{it.explanation_he}</div>
+                          : (explains[it.id]
+                              ? <div className="bd">{explains[it.id]}</div>
+                              : <div className="bd wait">{explaining ? "המורה כותבת הסבר מפורט…" : it.explanation_he}</div>)}
+                      </div>
+                      {!air.done ? (
+                        <button className="ws-recheck" disabled={air.loading} onClick={() => recheck(it)}>
+                          {air.loading ? "בודק…" : "אני חושב שצדקתי — בדוק עם AI"}
+                        </button>
+                      ) : (
+                        <div className="ws-ai">{air.correct ? "ה-AI מאשר: התשובה שלך תקינה ✓ " : "ה-AI: "}{air.text}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ))}
+
+        <div className="ws-footer">{graded ? `${correctCount} / ${total} correct` : "Good luck!"}</div>
+      </div>
+
+      {graded && <p className="ws-summary">ציון {pct} · {correctCount} מתוך {total} נכונות. הערות המורה מופיעות ליד כל שאלה שנפלה.</p>}
+
+      <div className="ws-bar">
+        {!graded ? (
+          <button className="ws-btn" onClick={submit}>הגש לבדיקה</button>
+        ) : (
+          <>
+            <button className="ws-btn" onClick={generate}>מבחן חדש · אותן הגדרות</button>
+            <button className="ws-btn ghost" onClick={() => { setScreen("setup"); setError(""); }}>שינוי הגדרות</button>
+          </>
+        )}
+        <button className="ws-btn ghost" onClick={() => window.print()}>הדפסה</button>
+      </div>
+    </div>
+  );
+}
+
+
+function Gate() {
+  const [authed, setAuthed] = useState(null);
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { fetch("/api/me").then(r => r.json()).then(d => setAuthed(!!d.authed)).catch(() => setAuthed(false)); }, []);
+  async function submit() {
+    if (busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: user.trim(), pass }) });
+      const d = await r.json();
+      if (d.ok) setAuthed(true); else setErr("שם משתמש או סיסמה שגויים");
+    } catch { setErr("שגיאה בהתחברות, נסו שוב"); } finally { setBusy(false); }
+  }
+  if (authed === null) return (<div className="gate"><div className="gate-card"><div className="sub">רגע…</div></div></div>);
+  if (authed) return <EnglishTest />;
+  return (
+    <div className="gate">
+      <div className="gate-card">
+        <h1>מבחן הזמנים</h1>
+        <div className="sub">כניסה לתרגול</div>
+        <div className="gate-field"><label>שם משתמש</label>
+          <input value={user} onChange={e => setUser(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} autoFocus /></div>
+        <div className="gate-field"><label>סיסמה</label>
+          <input type="password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} /></div>
+        <button className="gate-btn" disabled={busy} onClick={submit}>{busy ? "מתחבר…" : "כניסה"}</button>
+        <div className="gate-err">{err}</div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Gate />);
+
+</script>
+</body>
+</html>
