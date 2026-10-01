@@ -5,5 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>TensesSite</RootNamespace>
     <AssemblyName>TensesSite</AssemblyName>
+    <UserSecretsId>85fa7a3d-e381-4270-86a3-f7c9101aa75a</UserSecretsId>
   </PropertyGroup>
 </Project>

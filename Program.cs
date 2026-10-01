@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddUserSecrets<Program>(optional: true);
 var app = builder.Build();
 
 var cfg = app.Configuration;
@@ -15,7 +16,7 @@ string  secret        = string.IsNullOrEmpty(cfg["SESSION_SECRET"])
                             ? Convert.ToHexString(RandomNumberGenerator.GetBytes(16))
                             : cfg["SESSION_SECRET"]!;
 string  allowedOrigin = cfg["ALLOWED_ORIGIN"] ?? "";
-int     maxTokens     = int.TryParse(cfg["MAX_TOKENS"], out var mt) ? mt : 1024;
+int     maxTokens     = int.TryParse(cfg["MAX_TOKENS"], out var mt) ? mt : 4096;
 
 // Cookie value: HMAC of the username with a server secret (never leaves the server).
 string token = Hmac(secret, appUser);
@@ -65,7 +66,7 @@ app.MapPost("/api/claude", async (HttpContext ctx) =>
     if (!IsAuthed(ctx.Request))
         return Results.Json(new { error = "login required" }, statusCode: 401);
     if (string.IsNullOrEmpty(apiKey))
-        return Results.Json(new { error = "Server is missing ANTHROPIC_API_KEY" }, statusCode: 500);
+        return Results.Json(new { error = "ai_key_invalid", message = "מפתח ה-AI (ANTHROPIC_API_KEY) חסר בהגדרות השרת." }, statusCode: 502);
 
     var origin = ctx.Request.Headers["Origin"].ToString();
     if (!string.IsNullOrEmpty(allowedOrigin) && !string.IsNullOrEmpty(origin) && origin != allowedOrigin)
@@ -101,6 +102,8 @@ app.MapPost("/api/claude", async (HttpContext ctx) =>
     catch { return Results.Json(new { error = "upstream error" }, statusCode: 502); }
 
     var text = await resp.Content.ReadAsStringAsync();
+    if ((int)resp.StatusCode == 401 || (int)resp.StatusCode == 403)
+        return Results.Json(new { error = "ai_key_invalid", message = "מפתח ה-AI לא תקין או פג תוקף. יש לבדוק את ANTHROPIC_API_KEY בהגדרות השרת." }, statusCode: 502);
     return Results.Content(text, "application/json", Encoding.UTF8, (int)resp.StatusCode);
 });
 

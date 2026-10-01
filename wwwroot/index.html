@@ -87,6 +87,8 @@ const STYLE = `
 }
 .ws-page::before{content:"";position:absolute;top:0;bottom:0;left:0;width:34px;
   border-right:1.5px solid color-mix(in srgb,var(--bad) 30%,transparent);opacity:.5;}
+.ws-page.rtl{direction:rtl;text-align:right;}
+.ws-page.rtl::before{left:auto;right:0;border-right:none;border-left:1.5px solid color-mix(in srgb,var(--bad) 30%,transparent);}
 .ws-headline{text-align:center;margin:0 0 4px;}
 .ws-headline h2{font-family:'Nunito';font-weight:900;font-size:clamp(18px,3.5vw,24px);margin:0;display:inline-block;border-bottom:2px solid var(--ink);padding-bottom:3px;}
 .ws-headline p{color:var(--faint);font-size:13px;margin:8px 0 0;letter-spacing:.02em;}
@@ -110,6 +112,9 @@ const STYLE = `
 .ws-line{font-size:16.5px;line-height:1.9;}
 .ws-num{font-weight:800;margin-right:8px;}
 .ws-fillline{display:inline-block;border-bottom:1.5px solid var(--ink);min-width:70px;vertical-align:baseline;}
+.ws-frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 5px;line-height:1.3;}
+.ws-frac .num{padding:0 4px 2px;border-bottom:1.5px solid var(--ink);}
+.ws-frac .den{padding:2px 4px 0;}
 
 .ws-blank{font-family:'Caveat';font-weight:700;font-size:21px;color:var(--pen);text-align:center;
   border:none;border-bottom:2px solid #9c99b8;background:color-mix(in srgb,var(--pen) 5%,transparent);
@@ -211,6 +216,11 @@ async function callClaude(user, system) {
     body: JSON.stringify({ system, messages: [{ role: "user", content: user }] }),
   });
   if (res.status === 401) { location.reload(); throw new Error("auth"); }
+  if (res.status === 502) {
+    let msg = "יש בעיה במפתח ה-AI (חסר / לא תקין / פג תוקף). פנה/י למנהל המערכת.";
+    try { const d = await res.json(); if (d && d.message) msg = d.message; } catch {}
+    const err = new Error(msg); err.aiKey = true; throw err;
+  }
   if (!res.ok) throw new Error("proxy " + res.status);
   const data = await res.json();
   const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
@@ -268,7 +278,7 @@ Return ONLY JSON: {"title":"...","passage":"...","complete":[{"sentence":"Everyo
   };
 }
 
-function EnglishTest() {
+function EnglishTest({ onChangeSubject }) {
   const [screen, setScreen] = useState("setup"); // setup | loading | test
   const [sections, setSections] = useState(new Set(SECTION_ORDER));
   const [tenses, setTenses] = useState(new Set(Object.keys(TENSES)));
@@ -313,8 +323,8 @@ function EnglishTest() {
       setAnswers({}); setMarks({}); setAi({}); setExplains({}); setExplaining(false); setOpenFb({}); setGradingOpen(false); setGraded(false);
       setScreen("test");
       preExplain(all.filter(it => it.section !== "wh")); // prepare tense explanations in the background while the student works
-    } catch {
-      setError("לא הצלחתי לייצר מבחן כרגע. נסה שוב — לרוב זה עובד בניסיון השני.");
+    } catch (e) {
+      setError(e && e.aiKey ? e.message : "לא הצלחתי לייצר מבחן כרגע. נסה שוב — לרוב זה עובד בניסיון השני.");
       setScreen("setup");
     }
   }
@@ -411,6 +421,7 @@ function EnglishTest() {
     return (
       <div className="ws-root"><style>{STYLE}</style>
         <div className="ws-setup">
+          <p className="ws-eyebrow" style={{ cursor: "pointer" }} onClick={onChangeSubject}>‹ בחירת מקצוע אחר</p>
           <p className="ws-eyebrow">תרגול אנגלית · מבוסס AI</p>
           <h1 className="ws-h1">מבחן הזמנים</h1>
           <p className="ws-lead">תרגול בסגנון דף מבחן של כיתה ז', באותה רמה כמו בדף. ה-AI מרכיב מבחן חדש, אתה ממלא הכול בעט על הדף, ובסוף "המורה" בודקת עם ✓/✗ אדום-ירוק וציון מוקף בעיגול. על כל שאלה שטעית בה תקבל הסבר מפורט: איזו מילת זמן חושפת את הזמן, מה הכלל הדקדוקי, ולמה התשובה שלך שגויה.</p>
@@ -709,12 +720,410 @@ function EnglishTest() {
 }
 
 
+const MATH_SECTIONS = {
+  order_ops:       { he: "סדר פעולות חשבון עם מספרים מכוונים",                       letter: "א", group: "אלגברה" },
+  op_rules:        { he: "חוקי הפעולות, מספרים הופכיים ומספרים נגדיים",              letter: "ב", group: "אלגברה" },
+  expressions:     { he: "ביטויים אלגבריים ומשוואות",                                letter: "ג", group: "אלגברה" },
+  coordinates:     { he: "מערכת צירים בשילוב קריאת גרפים",                           letter: "ד", group: "אלגברה" },
+  ratio:           { he: "יחס בין מספרים וחלוקה ביחס נתון",                          letter: "ה", group: "אלגברה" },
+  proportion:      { he: "פרופורציה",                                                letter: "ו", group: "אלגברה" },
+  triangle_angles: { he: "זוויות צמודות, זוויות קודקודיות, חוצה זווית וסכום זוויות במשולש", letter: "ז", group: "גיאומטריה" },
+  parallel_angles: { he: "זוויות מתאימות ומתחלפות בין ישרים מקבילים",                letter: "ח", group: "גיאומטריה" },
+};
+const MATH_SECTION_ORDER = Object.keys(MATH_SECTIONS);
+const MATH_GROUPS = ["אלגברה", "גיאומטריה"];
+
+function mathClean(s) {
+  return (s || "").toString().trim().toLowerCase().replace(/\s+/g, "").replace(/°/g, "").replace(/^x=/, "").replace(/^y=/, "");
+}
+function mathToNum(s) {
+  s = mathClean(s);
+  if (!s) return NaN;
+  if (s.endsWith("%")) return parseFloat(s) / 100;
+  if (s.includes("/")) { const [a, b] = s.split("/").map(Number); return b ? a / b : NaN; }
+  return parseFloat(s);
+}
+function mathEq(expected, given) {
+  if (mathClean(expected) === mathClean(given)) return true;
+  const en = mathToNum(expected), gn = mathToNum(given);
+  return Number.isFinite(en) && Number.isFinite(gn) && Math.abs(en - gn) < 0.001;
+}
+// Text with no Hebrew letters (pure equations like "12 - 3 · 5 + 2 = ___") has no strong-direction
+// character to anchor it, so the browser's bidi algorithm reorders it (and mirrors brackets) inside
+// an RTL page. Force it into an isolated LTR run so it renders in the order it was written.
+function noHebrew(s) { return !/[֐-׿]/.test(s || ""); }
+function ltrIfPureMath(s) { return noHebrew(s) ? { dir: "ltr", style: { unicodeBidi: "isolate" } } : {}; }
+// Items with a stacked fraction (it.frac = {num, den}) keep just "= ___" in `sentence`; this
+// reconstructs a flat text form for AI prompts (explanations, the recheck judge) that need the full question.
+function mathQuestionText(it) { return it.frac ? `(${it.frac.num}) / (${it.frac.den}) ${it.sentence}` : it.sentence; }
+
+const GEN_SYS_MATH = "אתה מייצר שאלות למבדק/מבחן מתמטיקה לכיתה ח' עבור תלמידים ישראלים, לפי ספר הלימוד 'צמרת'. כתוב את כל טקסט השאלה בעברית (השאר ביטויים אלגבריים וסימנים מתמטיים, כמו x, 2x+3=11, כפי שהם). הפלט חייב להיות JSON תקין בלבד — ללא markdown, ללא code fences וללא הערות. הגבל את 'explanation_he' לכל היותר 12 מילים בעברית.";
+
+function promptForMath(section, n) {
+  const tail = `כל פריט חייב להסתיים בקו תשובה "___" שבו התלמיד ירשום את התשובה הסופית. כל התרגיל מתואר במילים בלבד, בלי צורך בציור או בגרף בפועל. כל הטקסט בעברית.`;
+  if (section === "order_ops")
+    return `צור ${n} תרגילים לכיתה ח' בנושא סדר פעולות חשבון עם מספרים מכוונים (חיוביים ושליליים), ברוח ורמת הקושי של עבודת קיץ בית-ספרית אמיתית. ערבבו בין כל הסוגים הבאים (אל תיצרו רק מסוג אחד):
+(1) תרגיל חישוב רגיל, "sentence" מסתיים ב-"= ___" (2–4 פעולות, כפל בנקודה ·, חילוק בנקודתיים :, סוגריים ולעיתים מקוננים, לפעמים חזקה פשוטה), למשל "18 - 8 · 2 = ___" (תשובה 2), "-10 · (-2) : 5 = ___" (תשובה 4), "4 · (-6) + 8 · 3 = ___" (תשובה 0), "(5 + 2 · 6) · (3 : 3 - 3) = ___" (תשובה -34-), "-4 · [8 - 12 : (-2)] = ___" (תשובה -56-). "answers" = התוצאה המדויקת כטקסט פשוט.
+(2) תרגיל חישוב בצורת שבר: "sentence" הוא רק "= ___", ובנוסף שדה "frac" עם "num" (המונה, כטקסט) ו-"den" (המכנה, כטקסט) — בלי לשלב "/" בתוך sentence עצמו, למשל {"sentence":"= ___","frac":{"num":"-4 - 6 · 6","den":"2³"}} (תשובה -5-), {"sentence":"= ___","frac":{"num":"18 : (-6) + 21 : 7","den":"3"}} (תשובה 0). "answers" = התוצאה המדויקת כטקסט פשוט.
+(3) תרגיל השוואת סימן עם מספרים קונקרטיים (לא מופשטים) כך שיש תשובה חד-משמעית, "sentence" מסתיים ב-"___" והתשובה היא אחד הסימנים <, >, = , למשל "נתון a = -5, b = 3. השלימו סימן יחס מתאים: a + b ___ 0" (תשובה <), "נתון a = -4, b = -7. השלימו: a · b ___ 0" (תשובה >). "answers" = הסימן בלבד (<, > או =).
+(4) תרגיל השלמת מילה חסרה על חוקי הסימנים, "sentence" מסתיים ב-"___", התשובה מילה עברית קצרה אחת, למשל "מספר חיובי תמיד ___ ממספר שלילי" (תשובה גדול), "מכפלת שני מספרים שליליים היא מספר ___" (תשובה חיובי), "סכום שני מספרים שליליים הוא מספר ___" (תשובה שלילי). "answers" = המילה בלבד.
+(5) שאלת נכון/לא נכון (kind מסוג mcq): שדה "stem" עם הטענה ומסתיים ב-"___", שדה "options" חייב להיות בדיוק ["נכון","לא נכון"], ו-"correct" הוא 0 אם נכון או 1 אם לא נכון, למשל {"stem":"מכפלת שני מספרים שליליים היא תמיד מספר שלילי. ___","options":["נכון","לא נכון"],"correct":1}.
+צרו תרגילים חדשים ושונים בכל הסוגים (לא זהים לדוגמאות), במגוון טוב בין הסוגים. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"18 - 8 · 2 = ___","answers":["2"],"explanation_he":"..."},{"sentence":"= ___","frac":{"num":"-4 - 6 · 6","den":"2³"},"answers":["-5"],"explanation_he":"..."},{"stem":"מכפלת שני מספרים שליליים היא תמיד מספר שלילי. ___","options":["נכון","לא נכון"],"correct":1,"explanation_he":"..."}]}`;
+  if (section === "op_rules")
+    return `צור ${n} תרגילים לכיתה ח' בנושא חוקי הפעולות במספרים מכוונים (חוק החילוף, חוק הפילוג, חוק הקיבוץ), מספר הופכי (הופכי כפלי) ומספר נגדי (הופכי חיבורי), באותה רמת קושי כמו הדוגמאות הבאות מעבודת קיץ בית-ספרית אמיתית: "השלימו: 0.5 + ___ = 8 + 1/2" (תשובה 8), "השלימו לפי חוק הקיבוץ: (12 · 6) · 3 = 12 · ___" (תשובה 18), "מה צריך להיות הערך של b כדי ש- 5a + b = 7 + 5a יתקיים תמיד? b = ___" (תשובה 7, חוק החילוף), "המספר ההופכי של 3/4 הוא ___" (תשובה 4/3), "המספר הנגדי של 7- הוא ___" (תשובה 7). צור תרגילים חדשים ושונים באותה רוח וקושי, ערבבו בין הסוגים. "answers" = תשובה קצרה כטקסט/מספר. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"המספר הנגדי של 7- הוא ___","answers":["7"],"explanation_he":"..."}]}`;
+  if (section === "expressions")
+    return `צור ${n} תרגילים לכיתה ח' בנושא ביטויים אלגבריים ומשוואות, באותה רמת קושי כמו הדוגמאות הבאות מעבודת קיץ בית-ספרית אמיתית — ערבבו בין: (1) פתרון משוואות ליניאריות עם סוגריים/שברים/עשרוניים, לדוגמה "פתור/י: 6x + 3 - 2x = -5. x = ___" (תשובה -2-), "פתור/י: 7x - 6 = 4x + 6. x = ___" (תשובה 4), "פתור/י: 5(x - 2) = 5. x = ___" (תשובה 3); (2) פישוט ביטוי אלגברי, לדוגמה "פשטו: -3a - 5 + 5a + 2 = ___" (תשובה 2a-3, כטקסט ללא רווחים); (3) פתיחת סוגריים, לדוגמה "פתחו את הסוגריים: 2(3a + 7) = ___" (תשובה 6a+14); (4) הצבת מספרים בביטוי אלגברי וחישוב ערכו, לדוגמה "נתון הביטוי (3t - 8) / (4m + 5). הציבו t=2, m=-1 וחשבו את ערך הביטוי. ___" (תשובה -2-). צור תרגילים חדשים ושונים באותה רוח וקושי. "answers" = רשימת תשובות מקובלות כטקסט פשוט (מספר או ביטוי אלגברי ללא רווחים, למשל "2a-3"). ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"פתור/י: 7x - 6 = 4x + 6. x = ___","answers":["4"],"explanation_he":"..."}]}`;
+  if (section === "coordinates")
+    return `צור ${n} תרגילים לכיתה ח' בנושא מערכת הצירים וקריאת גרפים, באותה רמת קושי כמו הדוגמאות הבאות מעבודת קיץ בית-ספרית אמיתית — ערבבו בין: (1) זיהוי רביע לפי סימני הקואורדינטות, לדוגמה "הנקודה A(-3,5) נמצאת ברביע מספר ___ (1, 2, 3 או 4)" (תשובה 2); (2) שיפוע ישר העובר דרך שתי נקודות נתונות, לדוגמה "שיפוע הישר העובר דרך הנקודות (0,2) ו-(4,10) הוא ___" (תשובה 2); (3) נקודת אמצע של קטע, לדוגמה "נקודת האמצע של הקטע שקצותיו (2,3) ו-(6,7) היא ___ (רשמו כ-(x,y) בלי רווחים)" (תשובה (4,5)); (4) שטח מלבן שקדקודיו נתונים במערכת הצירים, לדוגמה "לנקודות מלבן שיעורים A(-4,5), B(3,5), C(3,-3), D(-4,-3). מהו שטח המלבן ביחידות ריבועיות? ___" (תשובה 56); (5) בעיה מילולית המתארת גרף במילים (כמו מד דלק או טעינת סוללה שעולה/יורדת בקטעים), לדוגמה "אופנוע יצא לדרך עם 10 ליטר דלק. אחרי 40 ק\\"מ הוא עצר בתחנת דלק ומילא דלק עד ל-30 ליטר. כמה ליטר דלק מילא בתחנה? ___" (תשובה 20). צור תרגילים חדשים ושונים באותה רוח וקושי. "answers" = תשובה קצרה (מספר, מספר רביע, או זוג קואורדינטות כמו "(4,5)" בלי רווחים). ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"שיפוע הישר העובר דרך הנקודות (0,2) ו-(4,10) הוא ___","answers":["2"],"explanation_he":"..."}]}`;
+  if (section === "ratio")
+    return `צור ${n} תרגילים לכיתה ח' בנושא יחס בין מספרים וחלוקת כמות ביחס נתון (לדוגמה: "היחס בין מספר התלמידות למספר התלמידים בכיתה הוא 3:4. אם יש 18 תלמידות, כמה תלמידים יש? ___", "חלקו 60 שקלים בין דן לרון ביחס 2:3. כמה מקבל רון? ___"). "answers" = מספר. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"חלקו 60 שקלים בין דן לרון ביחס 2:3. כמה מקבל רון? ___","answers":["36"],"explanation_he":"..."}]}`;
+  if (section === "proportion")
+    return `צור ${n} תרגילי פרופורציה (שוויון בין שני יחסים) לכיתה ח' (לדוגמה: "פתור/י את הפרופורציה: 3/4 = x/12. x = ___"). "answers" = מספר. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"פתור/י את הפרופורציה: 3/4 = x/12. x = ___","answers":["9"],"explanation_he":"..."}]}`;
+  if (section === "triangle_angles")
+    return `צור ${n} תרגילים לכיתה ח' בנושא זוויות צמודות (סכומן 180°), זוויות קודקודיות (שוות זו לזו), חוצה זווית, וסכום זוויות במשולש (180°), באותה רמת קושי כמו הדוגמאות הבאות מעבודת קיץ בית-ספרית אמיתית — ערבבו בין: (1) זוויות צמודות/קודקודיות פשוטות, לדוגמה "שתי זוויות צמודות. אחת מהן 65°. מה גודל השנייה? ___" (תשובה 115), "שתי זוויות קודקודיות. אחת מהן 42°. מה גודל השנייה? ___" (תשובה 42); (2) סכום זוויות במשולש עם מספרים נתונים, לדוגמה "במשולש שתי זוויותיו 50° ו-70°. מה גודל הזווית השלישית? ___" (תשובה 60); (3) חוצה זווית, לדוגמה "קרן חוצה זווית של 80°. מה גודל כל אחת משתי הזוויות השוות שנוצרו? ___" (תשובה 40); (4) זווית ישרה שמתחלקת לשתי זוויות צמודות, לדוגמה "הזוויות ACD ו-DCB צמודות ויוצרות יחד קו ישר (180°). אם ACD שווה 37°, מה גודל DCB? ___" (תשובה 143); (5) תרגיל אלגברי-גיאומטרי משולב שדורש קודם לפתור משוואה ואז למצוא זווית, לדוגמה "זווית ישרה מתחלקת על ידי קרן לשתי זוויות: אחת בגודל x והשנייה בגודל 2x+30°. מהו גודל x? ___" (תשובה 50), או "במשולש זוויותיו הן x, x+30° ו-3x. מהו גודל x? ___" (תשובה 30). צור תרגילים חדשים ושונים באותה רוח וקושי, ערבבו בין הסוגים. "answers" = מספר במעלות בלבד, בלי הסימן °. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"במשולש שתי זוויותיו 50° ו-70°. מה גודל הזווית השלישית? ___","answers":["60"],"explanation_he":"..."}]}`;
+  // parallel_angles
+  return `צור ${n} תרגילים לכיתה ח' בנושא זוויות בין שני ישרים מקבילים שנחתכים על ידי ישר חותך — זוויות מתאימות (שוות) וזוויות מתחלפות (שוות) — כל תרגיל מתואר במילים בלבד (לדוגמה: "שני ישרים מקבילים נחתכים על ידי ישר שלישי. אחת הזוויות שנוצרות היא 72°. מה גודל הזווית המתאימה לה? ___", "...מה גודל הזווית המתחלפת לה? ___"). "answers" = מספר במעלות בלבד, בלי הסימן °. ${tail}\nהחזר ONLY JSON: {"items":[{"sentence":"שני ישרים מקבילים נחתכים על ידי ישר שלישי. אחת הזוויות שנוצרות היא 72°. מה גודל הזווית המתאימה לה? ___","answers":["72"],"explanation_he":"..."}]}`;
+}
+
+function validateMath(section, arr) {
+  // Most topics are plain fill-in-the-blank, but a topic can mix in mcq items (e.g. true/false,
+  // "which is correct") — each item carries its own kind rather than the whole section being fixed.
+  const isMcq = x => x && Array.isArray(x.options) && Number.isInteger(x.correct);
+  return (arr || []).filter(x => {
+    if (!x) return false;
+    if (isMcq(x)) return typeof x.stem === "string" && x.options.length >= 2 && x.correct < x.options.length;
+    return typeof x.sentence === "string" && x.sentence.includes("___") && Array.isArray(x.answers) && x.answers.length;
+  }).map((x, i) => ({ ...x, kind: isMcq(x) ? "mcq" : "fill", section, id: `${section}_${i}` }));
+}
+
+function MathTest({ onChangeSubject }) {
+  const [screen, setScreen] = useState("setup"); // setup | loading | test
+  const [sections, setSections] = useState(new Set(MATH_SECTION_ORDER));
+  const [count, setCount] = useState(5);
+  const [error, setError] = useState("");
+
+  const [items, setItems] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [meta, setMeta] = useState({ name: "", cls: "", date: "" });
+  const [graded, setGraded] = useState(false);
+  const [marks, setMarks] = useState({});
+  const [ai, setAi] = useState({});
+  const [explains, setExplains] = useState({});
+  const [explaining, setExplaining] = useState(false);
+
+  const toggle = (setter, cur, key, min = 1) => {
+    const n = new Set(cur); n.has(key) ? n.delete(key) : n.add(key);
+    if (n.size >= min) setter(n);
+  };
+
+  async function generate() {
+    setError(""); setScreen("loading");
+    const chosen = MATH_SECTION_ORDER.filter(s => sections.has(s));
+    try {
+      const results = await Promise.all(chosen.map(sec =>
+        callClaude(promptForMath(sec, count), GEN_SYS_MATH).then(r => validateMath(sec, (r.items || []).slice(0, count)))
+      ));
+      const all = results.flat();
+      if (all.length < chosen.length) throw new Error("thin");
+      setItems(all);
+      setAnswers({}); setMarks({}); setAi({}); setExplains({}); setExplaining(false); setGraded(false);
+      setScreen("test");
+      preExplain(all);
+    } catch (e) {
+      setError(e && e.aiKey ? e.message : "לא הצלחתי לייצר מבחן כרגע. נסה שוב — לרוב זה עובד בניסיון השני.");
+      setScreen("setup");
+    }
+  }
+
+  function isCorrect(it, ans) {
+    if (it.kind === "mcq") return ans === it.correct;
+    return it.answers.some(a => mathEq(a, ans));
+  }
+  function submit() {
+    const m = {};
+    items.forEach(it => { m[it.id] = isCorrect(it, answers[it.id]); });
+    setMarks(m); setGraded(true);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    const missing = items.filter(it => !m[it.id] && !explains[it.id]);
+    if (missing.length) preExplain(missing);
+  }
+
+  async function preExplain(list) {
+    if (!list.length) return;
+    setExplaining(true);
+    const describe = (it) => ({
+      id: it.id,
+      question: it.kind === "mcq" ? it.stem : mathQuestionText(it),
+      correct_answer: it.kind === "mcq" ? it.options[it.correct] : it.answers[0],
+    });
+    const chunks = [];
+    for (let i = 0; i < list.length; i += 6) chunks.push(list.slice(i, i + 6));
+    const sys = "You are a warm, clear math teacher for an 8th-grade native Hebrew speaker. Write in simple Hebrew. Output ONLY valid JSON.";
+    await Promise.all(chunks.map(async (ch) => {
+      try {
+        const user = `For each item write a short Hebrew explanation of 2–3 sentences covering, in order: (1) which rule or formula applies; (2) the step-by-step method to reach the correct answer. Simple and friendly, like a good teacher. Items: ${JSON.stringify(ch.map(describe))}\nReturn ONLY JSON: {"explanations":[{"id":"a0","text_he":"..."}]}`;
+        const r = await callClaude(user, sys);
+        setExplains(prev => {
+          const mp = { ...prev };
+          (r.explanations || []).forEach(e => { if (e && e.id && !mp[e.id]) mp[e.id] = e.text_he; });
+          return mp;
+        });
+      } catch { /* fall back to the short explanation_he already on each item */ }
+    }));
+    setExplaining(false);
+  }
+
+  async function recheck(it) {
+    setAi(a => ({ ...a, [it.id]: { loading: true } }));
+    const isMcq = it.kind === "mcq";
+    const stem = isMcq ? it.stem : mathQuestionText(it);
+    const exp = isMcq ? it.options[it.correct] : it.answers.join(", ");
+    const wrote = isMcq ? it.options[answers[it.id]] : answers[it.id];
+    const user = `Math test item: "${stem}". Expected answer: ${exp}. Student wrote: "${wrote}". Is the student's answer mathematically equivalent/correct (different valid forms, like an unsimplified fraction or a different but equal expression, are OK)? Reply ONLY JSON: {"correct": true, "feedback_he": "הסבר קצר בעברית"}`;
+    try {
+      const r = await callClaude(user, "You judge 8th-grade math answers, accepting mathematically equivalent forms. Output ONLY valid JSON.");
+      if (r.correct && !marks[it.id]) setMarks(m => ({ ...m, [it.id]: true }));
+      setAi(a => ({ ...a, [it.id]: { loading: false, done: true, correct: !!r.correct, text: r.feedback_he || "" } }));
+    } catch {
+      setAi(a => ({ ...a, [it.id]: { loading: false, done: true, correct: false, text: "לא הצלחתי לבדוק כרגע." } }));
+    }
+  }
+
+  const bySection = MATH_SECTION_ORDER.filter(s => sections.has(s)).map(s => ({ s, list: items.filter(i => i.section === s) })).filter(x => x.list.length);
+  const total = items.length;
+  const correctCount = items.filter(i => marks[i.id]).length;
+  const pct = total ? Math.round((correctCount / total) * 100) : 0;
+  const gradeWord = pct >= 90 ? "Excellent!" : pct >= 75 ? "Very good" : pct >= 55 ? "Good, keep going" : "Keep practising";
+
+  /* ---------------- SETUP ---------------- */
+  if (screen === "setup") {
+    return (
+      <div className="ws-root"><style>{STYLE}</style>
+        <div className="ws-setup">
+          <p className="ws-eyebrow" style={{ cursor: "pointer" }} onClick={onChangeSubject}>‹ בחירת מקצוע אחר</p>
+          <p className="ws-eyebrow">תרגול מתמטיקה · מבוסס AI</p>
+          <h1 className="ws-h1">מבחן במתמטיקה</h1>
+          <p className="ws-lead">תרגול בסגנון דף מבחן של כיתה ח', לפי נושאי המבדק בספר "צמרת". ה-AI מרכיב מבחן חדש, אתה ממלא הכול בעט על הדף, ובסוף "המורה" בודקת עם ✓/✗ אדום-ירוק וציון מוקף בעיגול. על כל שאלה שטעית בה תקבל הסבר מפורט איך פותרים.</p>
+          <div className="ws-panel">
+            {MATH_GROUPS.map(g => (
+              <React.Fragment key={g}>
+                <p className="ws-flabel">{g}</p>
+                <div className="ws-chips" style={{ marginBottom: 26 }}>
+                  {MATH_SECTION_ORDER.filter(s => MATH_SECTIONS[s].group === g).map(s => (
+                    <span key={s} className="ws-chip" data-on={sections.has(s)} role="button" tabIndex={0}
+                          onClick={() => toggle(setSections, sections, s)}
+                          onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggle(setSections, sections, s)}>
+                      {MATH_SECTIONS[s].letter}) {MATH_SECTIONS[s].he}
+                    </span>
+                  ))}
+                </div>
+              </React.Fragment>
+            ))}
+
+            <p className="ws-flabel">שאלות בכל חלק</p>
+            <div className="ws-chips" style={{ marginBottom: 26 }}>
+              {[5, 8].map(c => (
+                <span key={c} className="ws-chip" data-on={count === c} role="button" tabIndex={0}
+                      onClick={() => setCount(c)} onKeyDown={e => (e.key === "Enter" || e.key === " ") && setCount(c)}>{c}</span>
+              ))}
+            </div>
+
+            <button className="ws-start" disabled={sections.size === 0} onClick={generate}>
+              הכן מבחן · {MATH_SECTION_ORDER.filter(s => sections.has(s)).length * count} שאלות
+            </button>
+            {error && <div className="ws-err">{error}</div>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- LOADING ---------------- */
+  if (screen === "loading") {
+    return (
+      <div className="ws-root"><style>{STYLE}</style>
+        <div className="ws-setup">
+          <div className="ws-panel"><div className="ws-loading"><div className="ws-spin" /><p>מרכיבים מבחן טרי…</p></div></div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- TEST PAGE ---------------- */
+  let n = 0;
+  return (
+    <div className="ws-root"><style>{STYLE}</style>
+      <div className="ws-page rtl">
+        {graded && (
+          <div className="ws-grade">
+            <div className="num">{pct}</div>
+            <div className="word">{gradeWord}</div>
+          </div>
+        )}
+
+        <div className="ws-headline">
+          <h2>מבחן במתמטיקה · כיתה ח'</h2>
+          <p>לפי נושאי המבדק · ספר "צמרת"</p>
+        </div>
+
+        <div className="ws-metarow">
+          <span className="ws-field">שם <input value={meta.name} disabled={graded} onChange={e => setMeta({ ...meta, name: e.target.value })} /></span>
+          <span className="ws-field">כיתה <input style={{ width: 60 }} value={meta.cls} disabled={graded} onChange={e => setMeta({ ...meta, cls: e.target.value })} /></span>
+          <span className="ws-field">תאריך <input style={{ width: 90 }} value={meta.date} disabled={graded} onChange={e => setMeta({ ...meta, date: e.target.value })} /></span>
+          <span className="ws-row-badge">שורה א'</span>
+        </div>
+        <p className="ws-instr">ענה/עני על כל השאלות, ואז הגש/י את המבחן.</p>
+        <hr className="ws-divider" />
+
+        {bySection.map(({ s, list }) => (
+          <section className="ws-sec" key={s}>
+            <div className="ws-sec-h">
+              <span className="lhs">{MATH_SECTIONS[s].letter}) {MATH_SECTIONS[s].he}</span>
+              <span className="pts">({list.length} × 2 נק')</span>
+            </div>
+
+            {list.map((it) => {
+              n += 1;
+              const a = answers[it.id];
+              const ok = marks[it.id];
+              const wrong = graded && !ok;
+              const air = ai[it.id] || {};
+              const cls = "ws-item" + (graded ? (ok ? " answered-ok" : " answered-wrong") : "");
+
+              if (it.kind === "mcq") {
+                const parts = it.stem.split("___");
+                return (
+                  <div className={cls} key={it.id}>
+                    {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                    <div className="ws-line">
+                      <span className="ws-num">{n})</span>
+                      <span {...ltrIfPureMath(it.stem)}>{parts[0]}{parts.length > 1 && <span className="ws-fillline" />}{parts[1] || ""}</span>
+                    </div>
+                    <div className="ws-opts">
+                      {it.options.map((opt, oi) => (
+                        <span key={oi} className="ws-opt" role="button" tabIndex={0}
+                              data-sel={a === oi} data-correct={graded && oi === it.correct}
+                              onClick={() => !graded && setAnswers({ ...answers, [it.id]: oi })}
+                              onKeyDown={e => !graded && (e.key === "Enter" || e.key === " ") && setAnswers({ ...answers, [it.id]: oi })}>
+                          <span className="lt">{LETTERS[oi]}.</span><span {...ltrIfPureMath(opt)}>{opt}</span>
+                          {graded && oi === it.correct && <span className="miniv">✓</span>}
+                        </span>
+                      ))}
+                    </div>
+                    {wrong && (
+                      <div className="ws-notewrap">
+                        <div className="ws-corr">התשובה הנכונה: <span className="corr" {...ltrIfPureMath(it.options[it.correct])}>{it.options[it.correct]}</span></div>
+                        <div className="ws-explain">
+                          <div className="hd">איך פותרים:</div>
+                          {explains[it.id]
+                            ? <div className="bd">{explains[it.id]}</div>
+                            : <div className="bd wait">{explaining ? "המורה כותבת הסבר מפורט…" : it.explanation_he}</div>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              const parts = it.sentence.split("___");
+              return (
+                <div className={cls} key={it.id}>
+                  {graded && <span className={"ws-mark " + (ok ? "ok" : "bad")}>{ok ? "✓" : "✗"}</span>}
+                  <div className="ws-line">
+                    <span className="ws-num">{n})</span>
+                    <span {...ltrIfPureMath(it.sentence)}>
+                      {it.frac && (
+                        <span className="ws-frac">
+                          <span className="num">{it.frac.num}</span>
+                          <span className="den">{it.frac.den}</span>
+                        </span>
+                      )}
+                      {parts[0]}
+                      <input className="ws-blank" style={{ width: `${Math.max(5, (a || "").length + 2)}ch` }}
+                             value={a || ""} disabled={graded} placeholder="…"
+                             onChange={e => setAnswers({ ...answers, [it.id]: e.target.value })} />
+                      {parts[1] || ""}
+                    </span>
+                  </div>
+                  {wrong && (
+                    <div className="ws-notewrap">
+                      <div className="ws-corr">→ <span className="corr" {...ltrIfPureMath(it.answers[0])}>{it.answers[0]}</span></div>
+                      <div className="ws-explain">
+                        <div className="hd">איך פותרים:</div>
+                        {explains[it.id]
+                          ? <div className="bd">{explains[it.id]}</div>
+                          : <div className="bd wait">{explaining ? "המורה כותבת הסבר מפורט…" : it.explanation_he}</div>}
+                      </div>
+                      {!air.done ? (
+                        <button className="ws-recheck" disabled={air.loading} onClick={() => recheck(it)}>
+                          {air.loading ? "בודק…" : "אני חושב שצדקתי — בדוק עם AI"}
+                        </button>
+                      ) : (
+                        <div className="ws-ai">{air.correct ? "ה-AI מאשר: התשובה שלך תקינה ✓ " : "ה-AI: "}{air.text}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ))}
+
+        <div className="ws-footer">{graded ? `${correctCount} מתוך ${total} נכונות` : "בהצלחה!"}</div>
+      </div>
+
+      {graded && <p className="ws-summary">ציון {pct} · {correctCount} מתוך {total} נכונות. הערות המורה מופיעות ליד כל שאלה שנפלה.</p>}
+
+      <div className="ws-bar">
+        {!graded ? (
+          <button className="ws-btn" onClick={submit}>הגש לבדיקה</button>
+        ) : (
+          <>
+            <button className="ws-btn" onClick={generate}>מבחן חדש · אותן הגדרות</button>
+            <button className="ws-btn ghost" onClick={() => { setScreen("setup"); setError(""); }}>שינוי הגדרות</button>
+          </>
+        )}
+        <button className="ws-btn ghost" onClick={() => window.print()}>הדפסה</button>
+      </div>
+    </div>
+  );
+}
+
+const SUBJECTS = [
+  { key: "english", he: "אנגלית", sub: "כיתה ז׳ · מבחן זמנים מעורבים", emoji: "🇬🇧" },
+  { key: "math", he: "מתמטיקה", sub: "כיתה ח׳ · אלגברה, שברים וגיאומטריה", emoji: "📐" },
+];
+
+function SubjectSelect({ onSelect }) {
+  return (
+    <div className="ws-root"><style>{STYLE}</style>
+      <div className="ws-setup">
+        <p className="ws-eyebrow">בחירת מקצוע</p>
+        <h1 className="ws-h1">איזה מבחן להכין?</h1>
+        <p className="ws-lead">בחר/י מקצוע וכיתה, ובשלב הבא אפשר להגדיר את המבחן.</p>
+        <div className="ws-panel" style={{ display: "grid", gap: 14 }}>
+          {SUBJECTS.map(s => (
+            <div key={s.key} className="ws-chip" style={{ padding: "18px 16px", textAlign: "right", fontSize: 16, cursor: "pointer" }}
+                 role="button" tabIndex={0}
+                 onClick={() => onSelect(s.key)}
+                 onKeyDown={e => (e.key === "Enter" || e.key === " ") && onSelect(s.key)}>
+              <div style={{ fontWeight: 800 }}>{s.emoji} {s.he}</div>
+              <div style={{ color: "var(--faint)", fontSize: 13, marginTop: 4 }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Gate() {
   const [authed, setAuthed] = useState(null);
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [subject, setSubject] = useState(null); // null | "english" | "math"
   useEffect(() => { fetch("/api/me").then(r => r.json()).then(d => setAuthed(!!d.authed)).catch(() => setAuthed(false)); }, []);
   async function submit() {
     if (busy) return;
@@ -726,7 +1135,11 @@ function Gate() {
     } catch { setErr("שגיאה בהתחברות, נסו שוב"); } finally { setBusy(false); }
   }
   if (authed === null) return (<div className="gate"><div className="gate-card"><div className="sub">רגע…</div></div></div>);
-  if (authed) return <EnglishTest />;
+  if (authed) {
+    if (!subject) return <SubjectSelect onSelect={setSubject} />;
+    if (subject === "english") return <EnglishTest onChangeSubject={() => setSubject(null)} />;
+    return <MathTest onChangeSubject={() => setSubject(null)} />;
+  }
   return (
     <div className="gate">
       <div className="gate-card">

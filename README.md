@@ -62,6 +62,6 @@ Then open the URL it prints (e.g. http://localhost:5000).
 - **Set a monthly spend limit** in the Anthropic Console (Billing) — your safety net.
 - The proxy fixes the model & `max_tokens` server-side and rate-limits per IP (40 Claude calls/min,
   15 login attempts/10 min). Tune in `Program.cs`.
-- Set `ALLOWED_ORIGIN` to your domain. `claude-haiku-4-5-20251001` is the default (fast & cheap);
+- Set `ALLOWED_ORIGIN` to your domain. `claude-sonnet-5-5` is the default (more reliable at math than the haiku models);
   change via `ANTHROPIC_MODEL`.
 - Confirm current model names / API version at https://docs.claude.com/en/api/overview
